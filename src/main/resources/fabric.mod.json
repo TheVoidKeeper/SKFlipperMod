@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "thevoidkeeper",
+  "version": "${version}",
+  "name": "SKFlipper",
+  "description": "Modulares Hypixel SkyBlock Tool (Bazaar/AH)",
+  "authors": ["thevoidkeeper"],
+  "contact": {
+    "homepage": "https://example.com",
+    "sources": "https://example.com/repo"
+  },
+  "license": "MIT",
+  "icon": "assets/thevoidkeeper/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "com.thevoidkeeper.skflipper.SKFlipperMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric": "*",
+    "minecraft": "1.21.5",
+    "fabric-language-kotlin": ">=1.12.2+kotlin.2.0.20",
+    "yet_another_config_lib_v3": ">=3.7.1+1.21.5-fabric",
+    "owo-lib": ">=0.12.20+1.21.5"
+  }
+}

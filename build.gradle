@@ -1,0 +1,88 @@
+plugins {
+    id 'fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+    id 'org.jetbrains.kotlin.jvm' version '2.0.20'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    // Offiziell
+    maven { url = 'https://maven.fabricmc.net/' }
+    mavenCentral()
+
+    // YACL (Xander Maven)
+    maven {
+        name = 'Xander Maven'
+        url = 'https://maven.isxander.dev/releases'
+    } // ← wichtig für YACL
+
+    // owo-lib
+    maven { url = 'https://maven.wispforest.io/releases' }
+
+    // Fallbacks (optional, schaden nicht)
+    maven { url = 'https://maven.shedaniel.me/' }
+    maven { url = 'https://api.modrinth.com/maven' }
+}
+
+dependencies {
+    // Minecraft/Fabric
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    // Kotlin
+    modImplementation "net.fabricmc:fabric-language-kotlin:1.13.2+kotlin.2.1.20"
+
+
+    // GUI / Config
+    modImplementation "dev.isxander:yet-another-config-lib:3.7.1+1.21.5-fabric" // YACL 1.21.5
+    modImplementation "io.wispforest:owo-lib:0.12.21+1.21.5" // stable für 1.21.5 :contentReference[oaicite:2]{index=2}
+
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0"
+    // Utils (optional)
+    implementation "com.google.code.gson:gson:2.11.0"
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+}
+
+fabricApi {
+    configureDataGeneration { client = true }
+}
+
+processResources {
+    inputs.property "version", project.version
+    filesMatching("fabric.mod.json") {
+        expand "version": inputs.properties.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach { it.options.release = 21 }
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+kotlin { jvmToolchain(21) }
+
+jar {
+    inputs.property "archivesName", project.base.archivesName
+    from("LICENSE") { rename { "${it}_${inputs.properties.archivesName}" } }
+}
+
+publishing {
+    publications {
+        create("mavenJava", MavenPublication) {
+            artifactId = project.archives_base_name
+            from components.java
+        }
+    }
+    repositories { }
+}
