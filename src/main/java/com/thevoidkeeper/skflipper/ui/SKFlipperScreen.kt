@@ -5,225 +5,180 @@ import io.wispforest.owo.ui.component.ButtonComponent
 import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout
-import io.wispforest.owo.ui.core.*
+import io.wispforest.owo.ui.core.Color
+import io.wispforest.owo.ui.core.HorizontalAlignment
+import io.wispforest.owo.ui.core.Insets
+import io.wispforest.owo.ui.core.OwoUIAdapter
+import io.wispforest.owo.ui.core.Sizing
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.font.TextRenderer
+import net.minecraft.client.gui.DrawContext
 import net.minecraft.text.Text
 import kotlin.math.pow
 
 class SKFlipperScreen(private val screenTitle: Text) : BaseOwoScreen<FlowLayout>() {
 
     private lateinit var contentRoot: FlowLayout
-    private lateinit var filterBar: FlowLayout
     private var activeTab: Tab = Tab.BAZAAR
-    private val tabAnimations = mutableMapOf<Tab, Float>()
 
-    override fun createAdapter(): OwoUIAdapter<FlowLayout> =
-        OwoUIAdapter.create(this) { _, _ ->
+    enum class Tab(val label: String) {
+        AUCTION_HOUSE("AuctionHouse"),
+        BAZAAR("Bazaar"),
+        SETTINGS("Settings")
+    }
+
+    override fun createAdapter(): OwoUIAdapter<FlowLayout> {
+        // Exakte Signatur für owo-lib 0.12.21
+        return OwoUIAdapter.create(this) { _, _ ->
             Containers.verticalFlow(Sizing.fill(100), Sizing.fill(100))
         }
+    }
 
     override fun build(root: FlowLayout) {
-        // Hintergrund abdunkeln
+        // EINMALIGER, halbtransparenter Hintergrund
         root.surface { ctx, comp ->
-            ctx.fill(
-                comp.x(),
-                comp.y(),
-                comp.x() + comp.width(),
-                comp.y() + comp.height(),
-                0x88000000.toInt()
-            )
+            ctx.fill(comp.x(), comp.y(), comp.x() + comp.width(), comp.y() + comp.height(), 0x88000000.toInt())
         }
 
         root.gap(0)
         root.padding(Insets.of(10))
         root.horizontalAlignment(HorizontalAlignment.CENTER)
 
-        val tabWidth = 110
-        val tabHeight = 20
         val borderColor = 0xFFFFFFFF.toInt()
 
-        // obere Linie
+        // OBERE LINIE (vollbreit)
         root.child(Components.box(Sizing.fill(100), Sizing.fixed(1)).apply {
             color(Color.ofArgb(borderColor))
         })
 
-        // Tabbar
-        val tabBar = Containers.horizontalFlow(Sizing.content(), Sizing.fixed(tabHeight)).apply {
+        // TABS – mittig, gleich breit
+        val windowW = MinecraftClient.getInstance().window.scaledWidth
+        val tabBarW = (windowW * 0.6f).toInt().coerceAtLeast(270)
+        val tabCount = Tab.values().size
+        val tabW = tabBarW / tabCount
+        val tabH = 20
+
+        val tabBar = Containers.horizontalFlow(Sizing.fixed(tabBarW), Sizing.fixed(tabH)).apply {
             horizontalAlignment(HorizontalAlignment.CENTER)
             gap(0)
         }
-
-        fun drawCenteredText(ctx: OwoUIDrawContext, tr: TextRenderer, text: Text, cx: Int, cy: Int, color: Int) {
-            val w = tr.getWidth(text)
-            ctx.drawText(tr, text, cx - w / 2, cy - tr.fontHeight / 2, color, false)
-        }
-
-        fun tabButton(tab: Tab): ButtonComponent {
-            val btn = Components.button(Text.literal(tab.label)) { switchTo(tab) }
-            btn.sizing(Sizing.fixed(tabWidth), Sizing.fixed(tabHeight))
-            tabAnimations[tab] = if (tab == activeTab) 1f else 0f
-
-            btn.renderer { ctx: OwoUIDrawContext, self: ButtonComponent, _: Float ->
-                val x = self.x()
-                val y = self.y()
-                val w = self.width()
-                val h = self.height()
-                val hovered = self.isHovered()
-                val tr = MinecraftClient.getInstance().textRenderer
-
-                val target = when {
-                    tab == activeTab -> 1f
-                    hovered -> 0.5f
-                    else -> 0f
-                }
-                val speed = 0.15f
-                val current = tabAnimations[tab] ?: 0f
-                val state = current + (target - current) * speed
-                tabAnimations[tab] = state
-
-                val inactiveBg = 0x22000000
-                val hoverBg = 0x33FFFFFF
-                val activeBg = 0x55FFFFFF
-                val bg = if (state < 0.5f)
-                    interpolateColor(inactiveBg, hoverBg, state * 2f)
-                else
-                    interpolateColor(hoverBg, activeBg, (state - 0.5f) * 2f)
-                ctx.fill(x, y, x + w, y + h, bg)
-
-                if (tab == activeTab) {
-                    val gold = 0xFFCC33
-                    val thickness = 2
-                    val tailLen = 48
-                    val falloff = 2.1f
-                    val waves = 2
-                    val speedPxPerSec = 140.0
-                    val perimeter = (w + h) * 2
-                    val tSec = System.nanoTime() / 1_000_000_000.0
-                    val head0 = (tSec * speedPxPerSec) % perimeter
-                    val phaseShift = perimeter / waves
-                    val heads = doubleArrayOf(head0, (head0 + phaseShift) % perimeter)
-
-                    fun drawBorderPoint(pos: Int, alpha: Int) {
-                        val color = ((alpha.coerceIn(0, 255) shl 24) or gold)
-                        val p = ((pos % perimeter.toInt()) + perimeter.toInt()) % perimeter.toInt()
-                        when {
-                            p < w -> for (o in 0 until thickness) ctx.fill(x + p, y + o, x + p + 1, y + o + 1, color)
-                            p < w + h -> for (o in 0 until thickness) ctx.fill(x + w - 1 - o, y + (p - w), x + w - o, y + (p - w) + 1, color)
-                            p < w + h + w -> {
-                                val off = p - (w + h)
-                                for (o in 0 until thickness) ctx.fill(x + (w - 1 - off), y + h - 1 - o, x + (w - off), y + h - o, color)
-                            }
-                            else -> {
-                                val off = p - (w + h + w)
-                                for (o in 0 until thickness) ctx.fill(x + o, y + (h - 1 - off), x + o + 1, y + (h - off), color)
-                            }
-                        }
-                    }
-                    for (head in heads) {
-                        val headInt = head.toInt()
-                        for (s in 0 until tailLen) {
-                            val pos = headInt - s
-                            val p = s.toFloat() / tailLen.toFloat()
-                            val alpha = (255.0 * (1.0 - p).pow(falloff.toDouble())).toInt()
-                            drawBorderPoint(pos, alpha)
-                        }
-                    }
-                }
-                drawCenteredText(ctx, tr, Text.literal(tab.label), x + w / 2, y + h / 2, 0xFFFFFF)
-            }
-            return btn
-        }
-
-        tabBar.child(tabButton(Tab.AUCTION_HOUSE))
-        tabBar.child(tabButton(Tab.BAZAAR))
-        tabBar.child(tabButton(Tab.SETTINGS))
+        tabBar.child(makeTab(Tab.AUCTION_HOUSE, tabW, tabH))
+        tabBar.child(makeTab(Tab.BAZAAR, tabW, tabH))
+        tabBar.child(makeTab(Tab.SETTINGS, tabW, tabH))
         root.child(tabBar)
 
-        // untere Linie
+        // UNTERE LINIE (vollbreit, direkt unter Tabs)
         root.child(Components.box(Sizing.fill(100), Sizing.fixed(1)).apply {
             color(Color.ofArgb(borderColor))
         })
 
-        // Filterleiste (einmalig)
-        filterBar = Containers.horizontalFlow(Sizing.fill(100), Sizing.fixed(26)).apply {
-            horizontalAlignment(HorizontalAlignment.CENTER)
-            gap(6)
-            margins(Insets.of(5))
-
-            fun label(s: String) = Components.label(Text.literal("$s:"))
-            fun box(w: Int) = Components.textBox(Sizing.fixed(w))
-
-            child(label("Search")); child(box(100))
-            child(label("Budget")); child(box(80))
-            child(label("Bulk")); child(box(80))
-            child(label("Min Margin")); child(box(90))
-            child(label("Min Volume")); child(box(90))
-        }
-        root.child(filterBar)
-
-        // Content
-        contentRoot = Containers.verticalFlow(Sizing.fill(100), Sizing.fill(100)).apply {
-            gap(6)
-            margins(Insets.top(6))
-        }
+        // CONTENT
+        contentRoot = Containers.verticalFlow(Sizing.fill(100), Sizing.fill(100)).apply { gap(6) }
         root.child(contentRoot)
 
-        updateFilterVisibility()
         rebuildContent(activeTab)
     }
 
-    private fun interpolateColor(from: Int, to: Int, p: Float): Int {
-        val fA = (from ushr 24) and 0xFF
-        val fR = (from ushr 16) and 0xFF
-        val fG = (from ushr 8) and 0xFF
-        val fB = from and 0xFF
-        val tA = (to ushr 24) and 0xFF
-        val tR = (to ushr 16) and 0xFF
-        val tG = (to ushr 8) and 0xFF
-        val tB = to and 0xFF
-        val pr = p.coerceIn(0f, 1f)
-        val a = (fA + ((tA - fA) * pr)).toInt()
-        val r = (fR + ((tR - fR) * pr)).toInt()
-        val g = (fG + ((tG - fG) * pr)).toInt()
-        val b = (fB + ((tB - fB) * pr)).toInt()
-        return (a shl 24) or (r shl 16) or (g shl 8) or b
+    private fun makeTab(tab: Tab, w: Int, h: Int): ButtonComponent {
+        val btn = Components.button(Text.empty()) { switchTo(tab) }
+        btn.sizing(Sizing.fixed(w), Sizing.fixed(h))
+        btn.margins(Insets.none())
+
+        btn.renderer { ctx: DrawContext, self: ButtonComponent, _ ->
+            renderTab(ctx, self, tab)
+        }
+        return btn
     }
 
     private fun switchTo(tab: Tab) {
         if (tab == activeTab) return
         activeTab = tab
-        updateFilterVisibility()
         rebuildContent(tab)
     }
 
-    private fun updateFilterVisibility() {
-        // Statt visible() nutzen wir einfach height ändern:
-        if (activeTab == Tab.BAZAAR) {
-            filterBar.sizing(Sizing.fill(100), Sizing.fixed(26))
-            filterBar.padding(Insets.of(5))
-            filterBar.gap(6)
-        } else {
-            filterBar.sizing(Sizing.fill(100), Sizing.fixed(0))
-            filterBar.padding(Insets.of(0))
-            filterBar.gap(0)
-        }
-    }
-
     private fun rebuildContent(tab: Tab) {
-        contentRoot.clearChildren()
-        when (tab) {
-            Tab.BAZAAR -> {}
-            Tab.AUCTION_HOUSE -> contentRoot.child(Components.label(Text.literal("→ AH support comes after Bazaar MVP.")))
-            Tab.SETTINGS -> contentRoot.child(Components.label(Text.literal("→ YACL-based config screen will be opened from here.")))
+        contentRoot.clearChildren() // wichtig: kompatible API
+        val text = when (tab) {
+            Tab.AUCTION_HOUSE -> Text.literal("➜ AH support comes after Bazaar MVP.")
+            Tab.BAZAAR        -> Text.literal("➜ Live Bazaar snapshot, margins & volume will appear here.")
+            Tab.SETTINGS      -> Text.literal("➜ YACL-based config screen will be opened from here.")
         }
+        contentRoot.child(Components.label(text))
     }
 
-    override fun shouldPause() = false
+    // ----------------- Rendering -----------------
 
-    enum class Tab(val label: String) {
-        AUCTION_HOUSE("AuctionHouse"),
-        BAZAAR("Bazaar"),
-        SETTINGS("Settings")
+    private fun renderTab(ctx: DrawContext, self: ButtonComponent, tab: Tab) {
+        val x = self.x()
+        val y = self.y()
+        val w = self.width()
+        val h = self.height()
+        val hovered = self.isHovered
+
+        // Hintergründe wie vorher
+        val baseColor = when {
+            tab == activeTab -> 0x88333333.toInt()
+            hovered         -> 0x55333333.toInt()
+            else            -> 0x33000000
+        }
+        ctx.fill(x, y, x + w, y + h, baseColor)
+
+        // Text mittig (kein Duplikat, weil Button-Message leer)
+        val tr: TextRenderer = MinecraftClient.getInstance().textRenderer
+        val label = Text.literal(tab.label)
+        val tx = x + (w - tr.getWidth(label)) / 2
+        val ty = y + (h - tr.fontHeight) / 2
+        ctx.drawText(tr, label, tx, ty, 0xFFFFFFFF.toInt(), false)
+
+        // Nur der aktive Tab bekommt die Sternschnuppen-Animation im Rahmen
+        if (tab == activeTab) drawCometBorder(ctx, x, y, w, h)
+    }
+
+    /**
+     * Zwei „Sternschnuppen“ laufen umlaufend im Rahmen (nur innerhalb),
+     * mit langem, weichem Tail (gold → transparent).
+     */
+    private fun drawCometBorder(ctx: DrawContext, x: Int, y: Int, w: Int, h: Int) {
+        val gold = 0xFFFFD94B.toInt()
+        val thickness = 2                  // Rahmenstärke (bleibt innerhalb)
+        val speedPx = 180.0                // Geschwindigkeit (px pro Sekunde)
+        val tailLen = 56                   // Tail-Länge
+        val falloff = 2.2f                 // Tail-Falloff
+        val perimeter = (w + h) * 2
+        val tSec = System.nanoTime() / 1_000_000_000.0
+        val head0 = (tSec * speedPx) % perimeter
+        val phase = perimeter / 2.0        // 2 Läufer gegenüber
+        val heads = doubleArrayOf(head0, (head0 + phase) % perimeter)
+
+        fun putPixel(px: Int, py: Int, a: Int) {
+            if (a <= 0) return
+            val color = ((a and 0xFF) shl 24) or (gold and 0xFFFFFF)
+            ctx.fill(px, py, px + 1, py + 1, color)
+        }
+
+        fun borderPoint(p: Int): Pair<Int, Int> {
+            val pp = ((p % perimeter) + perimeter) % perimeter
+            return when {
+                pp < w             -> Pair(x + pp,           y)            // top
+                pp < w + h         -> Pair(x + w - 1,       y + (pp - w))  // right
+                pp < w + h + w     -> Pair(x + (w - 1 - (pp - (w + h))), y + h - 1) // bottom
+                else               -> Pair(x,                 y + (h - 1 - (pp - (w + h + w)))) // left
+            }
+        }
+
+        // Rahmen“dicke“ innerhalb zeichnen
+        for (head in heads) {
+            val headI = head.toInt()
+            for (s in 0 until tailLen) {
+                val pos = headI - s
+                val alpha = (255.0 * (1.0 - (s.toFloat() / tailLen).pow(falloff))).toInt()
+                val (px, py) = borderPoint(pos)
+                // top/bottom ziehen horizontal in die Fläche, right/left vertikal in die Fläche
+                if      (py == y)           for (o in 0 until thickness) putPixel(px, py + o, alpha)          // top
+                else if (px == x + w - 1)   for (o in 0 until thickness) putPixel(px - o, py, alpha)          // right
+                else if (py == y + h - 1)   for (o in 0 until thickness) putPixel(px, py - o, alpha)          // bottom
+                else /* px == x */          for (o in 0 until thickness) putPixel(px + o, py, alpha)          // left
+            }
+        }
     }
 }
