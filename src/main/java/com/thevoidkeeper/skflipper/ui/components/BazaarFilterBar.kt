@@ -4,61 +4,68 @@ import io.wispforest.owo.ui.component.Components
 import io.wispforest.owo.ui.container.Containers
 import io.wispforest.owo.ui.container.FlowLayout
 import io.wispforest.owo.ui.core.*
-
 import net.minecraft.text.Text
 import kotlin.math.max
 import kotlin.math.min
 
 /**
  * Ein-/ausklappbare Filterleiste für den Bazaar-Tab (OwoLib 0.12.21)
- * - kein visibility/visible, nur Höhe 0 ↔ Zielhöhe
- * - active-Schalter steuert, ob getickt wird
+ * passt sich in der Breite an und umbrecht Filter automatisch innerhalb des dunklen Bereichs
  */
 class BazaarFilterBar(
     private val targetHeightPx: Int = 84,
     private val lerpFactor: Float = 0.25f
 ) {
 
-    val root: FlowLayout = Containers.horizontalFlow(Sizing.fill(100), Sizing.fixed(0)).apply {
+    val root: FlowLayout = Containers.verticalFlow(Sizing.fill(100), Sizing.fixed(0)).apply {
         surface(Surface.VANILLA_TRANSLUCENT)
-        padding(Insets.of(6))
-        gap(8)
-        alignment(HorizontalAlignment.LEFT, VerticalAlignment.CENTER)
+        padding(Insets.of(8))
+        gap(6)
+        horizontalAlignment(HorizontalAlignment.CENTER)
+        verticalAlignment(VerticalAlignment.TOP)
 
-        // Platzhalter-Controls (später durch echte Controls ersetzen/binden)
-        child(Components.label(Text.literal("Search:")))
-        child(Components.textBox(Sizing.fixed(110)))
+        // ─ Zeile 1 ─
+        val row1 = Containers.horizontalFlow(Sizing.content(), Sizing.fixed(22)).apply {
+            horizontalAlignment(HorizontalAlignment.CENTER)
+            gap(10)
+            child(labeledBox("Search:", 110))
+            child(labeledBox("Category:", 90))
+            child(labeledBox("Profit %:", 60))
+        }
 
-        child(Components.label(Text.literal("Category:")))
-        child(Components.textBox(Sizing.fixed(90)))
+        // ─ Zeile 2 ─
+        val row2 = Containers.horizontalFlow(Sizing.content(), Sizing.fixed(22)).apply {
+            horizontalAlignment(HorizontalAlignment.CENTER)
+            gap(10)
+            child(labeledBox("Volume:", 70))
+            child(labeledBox("Order:", 80))
+            child(labeledBox("Budget:", 70))
+            child(labeledBox("Bulk:", 70))
+        }
 
-        child(Components.label(Text.literal("Profit %:")))
-        child(Components.textBox(Sizing.fixed(60)))
-
-        child(Components.label(Text.literal("Volume:")))
-        child(Components.textBox(Sizing.fixed(70)))
-
-        child(Components.label(Text.literal("Order:")))
-        child(Components.textBox(Sizing.fixed(80)))
-
-        child(Components.label(Text.literal("Budget:")))
-        child(Components.textBox(Sizing.fixed(70)))
-
-        child(Components.label(Text.literal("Bulk:")))
-        child(Components.textBox(Sizing.fixed(70)))
+        this.child(row1)
+        this.child(row2)
     }
 
     private var active = false
     private var expanded = false
     private var progress = 0f
 
-    /** Vom Screen aufrufen, wenn der Tab aktiv/inaktiv wird */
+    private fun labeledBox(label: String, width: Int): FlowLayout {
+        val labelText = Components.label(Text.literal(label))
+        val box = Components.textBox(Sizing.fixed(width))
+        return Containers.horizontalFlow(Sizing.content(), Sizing.fixed(20)).apply {
+            gap(4)
+            child(labelText)
+            child(box)
+        }
+    }
+
     fun setActive(value: Boolean) {
         active = value
         if (!active) {
             reset()
         } else {
-            // aktiv, aber standardmäßig eingeklappt
             root.verticalSizing(Sizing.fixed(0))
             expanded = false
             progress = 0f
@@ -76,7 +83,6 @@ class BazaarFilterBar(
         root.verticalSizing(Sizing.fixed(0))
     }
 
-    /** pro Frame/Tick aufrufen */
     fun tick(delta: Float) {
         if (!active) return
         val target = if (expanded) 1f else 0f
